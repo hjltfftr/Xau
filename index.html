@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XAU/USD Chart + RSI + Stoch RSI</title>
+<style>
+  :root{--bg:#0f1318;--panel:#171c24;--line:#262d38;--text:#d5dbe3;--mute:#8a94a3;--acc:#f5b942}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,-apple-system,Segoe UI,sans-serif}
+  header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+  h1{font-size:16px;margin:0 8px 0 0;color:var(--acc)}
+  select,input,button{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit}
+  button{cursor:pointer}button:hover{border-color:var(--acc)}
+  label{color:var(--mute);font-size:12px}
+  #status{margin-left:auto;color:var(--mute);font-size:12px}
+  .wrap{padding:8px 10px}
+  .pane{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
+  .tag{position:absolute;left:10px;top:6px;z-index:5;font-size:12px;color:var(--mute);pointer-events:none}
+  #main{height:46vh}#rsi{height:20vh}#stoch{height:22vh}
+  .note{color:var(--mute);font-size:12px;padding:2px 4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>XAU/USD</h1>
+  <label>Sumber
+    <select id="src">
+      <option value="binance">Binance PAXG/USDT (tanpa API key)</option>
+      <option value="twelve">Twelve Data XAU/USD (API key gratis)</option>
+    </select>
+  </label>
+  <input id="key" type="password" placeholder="Twelve Data API key" style="display:none;width:170px">
+  <label>Timeframe
+    <select id="tf"><option>1m</option><option>5m</option><option>15m</option><option>30m</option><option selected>1h</option><option>4h</option><option>1d</option></select>
+  </label>
+  <label>RSI <input id="rsiN" type="number" value="14" min="2" style="width:52px"></label>
+  <label>Stoch <input id="stN" type="number" value="14" min="2" style="width:52px"></label>
+  <label>K <input id="kN" type="number" value="3" min="1" style="width:46px"></label>
+  <label>D <input id="dN" type="number" value="3" min="1" style="width:46px"></label>
+  <button id="go">Muat</button>
+  <span id="status"></span>
+</header>
+<div class="wrap">
+  <div class="pane"><div class="tag" id="t0">Harga</div><div id="main"></div></div>
+  <div class="pane"><div class="tag" id="t1">RSI</div><div id="rsi"></div></div>
+  <div class="pane"><div class="tag" id="t2">Stoch RSI</div><div id="stoch"></div></div>
+  <div class="note">PAXG adalah token emas yang harganya sangat dekat XAU/USD, tapi bukan harga spot yang persis sama. Untuk XAU/USD asli pilih Twelve Data. Bukan saran investasi.</div>
+</div>
+
+<script>
+function boot(){
+const $ = id => document.getElementById(id);
+if(typeof LightweightCharts==='undefined'){
+  $('status').textContent='Library chart gagal dimuat (cek internet / content blocker Safari)';
+  throw new Error('LightweightCharts missing');
+}
+const opts = h => ({
+  autoSize: true,
+  layout:{background:{color:'#171c24'},textColor:'#8a94a3'},
+  grid:{vertLines:{color:'#20262f'},horzLines:{color:'#20262f'}},
+  rightPriceScale:{borderColor:'#262d38'},
+  timeScale:{borderColor:'#262d38',timeVisible:true,secondsVisible:false},
+  crosshair:{mode:0}
+});
+const cMain = LightweightCharts.createChart($('main'), opts());
+const cRsi  = LightweightCharts.createChart($('rsi'), opts());
+const cSt   = LightweightCharts.createChart($('stoch'), opts());
+const candle = cMain.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderVisible:false,wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
+const rsiS = cRsi.addLineSeries({color:'#b388ff',lineWidth:2,priceLineVisible:false});
+const kS = cSt.addLineSeries({color:'#2196f3',lineWidth:2,priceLineVisible:false});
+const dS = cSt.addLineSeries({color:'#ff9800',lineWidth:2,priceLineVisible:false});
+[70,50,30].forEach(v=>rsiS.createPriceLine({price:v,color:'#4a5568',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''}));
+[80,50,20].forEach(v=>kS.createPriceLine({price:v,color:'#4a5568',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''}));
+cRsi.priceScale('right').applyOptions({autoScale:false});
+cSt.priceScale('right').applyOptions({autoScale:false});
+rsiS.applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:0,maxValue:100}})});
+kS.applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:0,maxValue:100}})});
+
+// sinkronisasi zoom/scroll
+let lock=false;
+const charts=[cMain,cRsi,cSt];
+charts.forEach(c=>c.timeScale().subscribeVisibleLogicalRangeChange(r=>{
+  if(lock||!r) return; lock=true;
+  charts.forEach(o=>{ if(o!==c) o.timeScale().setVisibleLogicalRange(r); });
+  lock=false;
+}));
+
+// ---------- indikator ----------
+function calcRSI(c,n){
+  const out=Array(c.length).fill(null);
+  if(c.length<=n) return out;
+  let g=0,l=0;
+  for(let i=1;i<=n;i++){const d=c[i]-c[i-1]; g+=Math.max(d,0); l+=Math.max(-d,0);}
+  g/=n; l/=n;
+  out[n]= l===0?100:100-100/(1+g/l);
+  for(let i=n+1;i<c.length;i++){
+    const d=c[i]-c[i-1];
+    g=(g*(n-1)+Math.max(d,0))/n; l=(l*(n-1)+Math.max(-d,0))/n;
+    out[i]= l===0?100:100-100/(1+g/l);
+  }
+  return out;
+}
+function sma(a,n){
+  return a.map((_,i)=>{
+    if(i<n-1) return null;
+    let s=0; for(let j=i-n+1;j<=i;j++){ if(a[j]==null) return null; s+=a[j]; }
+    return s/n;
+  });
+}
+function stochRSI(r,n){
+  return r.map((v,i)=>{
+    if(i<n-1) return null;
+    let mn=Infinity,mx=-Infinity;
+    for(let j=i-n+1;j<=i;j++){ if(r[j]==null) return null; mn=Math.min(mn,r[j]); mx=Math.max(mx,r[j]); }
+    return mx===mn?0:(v-mn)/(mx-mn)*100;
+  });
+}
+const toSeries=(t,a)=>t.map((x,i)=>a[i]==null?{time:x}:{time:x,value:a[i]});
+
+// ---------- data ----------
+async function fetchBinance(tf){
+  const hosts=['data-api.binance.vision','api.binance.com','api1.binance.com','api.binance.me'];
+  let err;
+  for(const h of hosts){
+    try{
+      const r=await fetch(`https://${h}/api/v3/klines?symbol=PAXGUSDT&interval=${tf}&limit=1000`);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return (await r.json()).map(k=>({time:Math.floor(k[0]/1000),open:+k[1],high:+k[2],low:+k[3],close:+k[4]}));
+    }catch(e){ err=e; }
+  }
+  throw new Error('Semua server Binance gagal ('+err.message+')');
+}
+// data acak HANYA untuk mengetes tampilan chart, bukan harga asli
+function demoData(tf){
+  const step={'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400}[tf];
+  let t=Math.floor(Date.now()/1000/step)*step-step*500, p=2400, out=[];
+  for(let i=0;i<500;i++){
+    const o=p, c=o+(Math.random()-0.5)*8+Math.sin(i/25)*2;
+    out.push({time:t,open:o,high:Math.max(o,c)+Math.random()*3,low:Math.min(o,c)-Math.random()*3,close:c});
+    p=c; t+=step;
+  }
+  return out;
+}
+async function fetchTwelve(tf,key){
+  const iv={'1m':'1min','5m':'5min','15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'}[tf];
+  const r=await fetch(`https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=${iv}&outputsize=1000&apikey=${encodeURIComponent(key)}`);
+  const j=await r.json();
+  if(j.status==='error'||!j.values) throw new Error(j.message||'Twelve Data error');
+  return j.values.reverse().map(v=>{
+    const s=v.datetime.length===10?v.datetime+'T00:00:00':v.datetime.replace(' ','T');
+    return {time:Math.floor(Date.parse(s+'Z')/1000),open:+v.open,high:+v.high,low:+v.low,close:+v.close};
+  });
+}
+
+let first=true;
+async function load(){
+  const st=$('status'); st.textContent='Memuat...';
+  try{
+    const tf=$('tf').value, src=$('src').value;
+    if(src==='twelve'&&!$('key').value) throw new Error('Isi API key Twelve Data dulu');
+    try{localStorage.setItem('xau_key',$('key').value);}catch(e){}
+    let d, demo=false;
+    try{ d= src==='binance'? await fetchBinance(tf) : await fetchTwelve(tf,$('key').value); }
+    catch(e){ d=demoData(tf); demo=true; var why=e.message; }
+    const t=d.map(x=>x.time), c=d.map(x=>x.close);
+    const rn=+$('rsiN').value, sn=+$('stN').value, kn=+$('kN').value, dn=+$('dN').value;
+    const r=calcRSI(c,rn), raw=stochRSI(r,sn), k=sma(raw,kn), dd=sma(k,dn);
+    candle.setData(d);
+    rsiS.setData(toSeries(t,r)); kS.setData(toSeries(t,k)); dS.setData(toSeries(t,dd));
+    $('t1').textContent=`RSI (${rn})`;
+    $('t2').textContent=`Stoch RSI (${rn}, ${sn}, ${kn}, ${dn})  — biru: %K, oranye: %D`;
+    if(first){ const n=d.length; cMain.timeScale().setVisibleLogicalRange({from:n-120,to:n+5}); first=false; }
+    const last=d[d.length-1];
+    if(demo){ st.textContent=`DATA CONTOH (bukan harga asli) · gagal ambil data: ${why}`; return; }
+    st.textContent=`Close ${last.close.toFixed(2)} · RSI ${r[r.length-1]?.toFixed(1)} · %K ${k[k.length-1]?.toFixed(1)} · %D ${dd[dd.length-1]?.toFixed(1)}`;
+  }catch(e){ st.textContent='Gagal: '+e.message; }
+}
+$('src').onchange=()=>{ $('key').style.display=$('src').value==='twelve'?'':'none'; };
+$('go').onclick=load; $('tf').onchange=()=>{first=true;load();};
+try{ $('key').value=localStorage.getItem('xau_key')||''; }catch(e){}
+load();
+let tick=0;
+setInterval(()=>{ if($('src').value==='binance'||++tick%4===0) load(); },30000);
+}
+</script>
+<script>
+(function(){
+  var f='/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';
+  var urls=['https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.1.3/lightweight-charts.standalone.production.js',
+    'https://cdn.jsdelivr.net/npm'+f,'https://unpkg.com'+f,'https://fastly.jsdelivr.net/npm'+f];
+  function next(i){
+    if(window.LightweightCharts||i>=urls.length){boot();return;}
+    var s=document.createElement('script');
+    s.src=urls[i]; s.onload=boot; s.onerror=function(){next(i+1);};
+    document.head.appendChild(s);
+  }
+  next(0);
+})();
+</script>
+</body>
+</html>
