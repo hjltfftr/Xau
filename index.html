@@ -72,8 +72,6 @@ const kS = cSt.addLineSeries({color:'#2196f3',lineWidth:2,priceLineVisible:false
 const dS = cSt.addLineSeries({color:'#ff9800',lineWidth:2,priceLineVisible:false});
 [70,50,30].forEach(v=>rsiS.createPriceLine({price:v,color:'#4a5568',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''}));
 [80,50,20].forEach(v=>kS.createPriceLine({price:v,color:'#4a5568',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''}));
-cRsi.priceScale('right').applyOptions({autoScale:false});
-cSt.priceScale('right').applyOptions({autoScale:false});
 rsiS.applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:0,maxValue:100}})});
 kS.applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:0,maxValue:100}})});
 
@@ -170,7 +168,7 @@ async function load(){
     rsiS.setData(toSeries(t,r)); kS.setData(toSeries(t,k)); dS.setData(toSeries(t,dd));
     $('t1').textContent=`RSI (${rn})`;
     $('t2').textContent=`Stoch RSI (${rn}, ${sn}, ${kn}, ${dn})  — biru: %K, oranye: %D`;
-    if(first){ const n=d.length; cMain.timeScale().setVisibleLogicalRange({from:n-120,to:n+5}); first=false; }
+    if(first){ const n=d.length; const rg={from:Math.max(0,n-120),to:n+5}; charts.forEach(c=>c.timeScale().setVisibleLogicalRange(rg)); first=false; }
     const last=d[d.length-1];
     if(demo){ st.textContent=`DATA CONTOH (bukan harga asli) · gagal ambil data: ${why}`; return; }
     st.textContent=`Close ${last.close.toFixed(2)} · RSI ${r[r.length-1]?.toFixed(1)} · %K ${k[k.length-1]?.toFixed(1)} · %D ${dd[dd.length-1]?.toFixed(1)}`;
