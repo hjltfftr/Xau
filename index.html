@@ -486,12 +486,13 @@ async function loadData(){
     render();
   }catch(e){ st.textContent='Gagal: '+e.message; }
 }
-// harga live: ambil tick terbaru tiap 1 detik dan gerakkan candle terakhir
-let liveBusy=false;
+// harga live: 300 request/menit (tiap 200 ms), maksimal 4 request berjalan bersamaan
+const LIVE_MS=200;
+let liveSeq=0, liveApplied=0, liveInflight=0, livePend=false;
 async function liveTick(){
   const src=$('src').value;
-  if(liveBusy||!cache||cache.demo||src==='twelve'||document.hidden) return;
-  liveBusy=true;
+  if(liveInflight>=4||!cache||cache.demo||src==='twelve'||document.hidden) return;
+  const my=++liveSeq; liveInflight++;
   try{
     let p;
     if(src==='biquote'){
@@ -505,15 +506,16 @@ async function liveTick(){
       if(!r.ok) return;
       p=+(await r.json()).price;
     }
-    if(!(p>0)||!cache) return;
+    if(!(p>0)||!cache||my<liveApplied) return;   // buang respons yang datang terlambat
+    liveApplied=my;
     const last=cache.d[cache.d.length-1], now=Date.now()/1000, step=STEP[$('tf').value];
     if(now>=last.time+step){ if(cache.rolled!==last.time){ cache.rolled=last.time; loadData(); } return; }
     if(p===last.close) return;
     last.close=p; last.high=Math.max(last.high,p); last.low=Math.min(last.low,p);
-    render(true);
-  }catch(e){} finally{ liveBusy=false; }
+    if(!livePend){ livePend=true; requestAnimationFrame(()=>{ livePend=false; render(true); }); }
+  }catch(e){} finally{ liveInflight--; }
 }
-setInterval(liveTick,1000);
+setInterval(liveTick,LIVE_MS);
 let dtm;
 const trig=()=>{ first=true; clearTimeout(dtm); dtm=setTimeout(loadData,150); };
 ['tf','sym','src','key'].forEach(id=>['change','input'].forEach(ev=>$(id).addEventListener(ev,()=>{
