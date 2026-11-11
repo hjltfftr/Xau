@@ -25,8 +25,7 @@
   .pane{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
   .tag{position:absolute;left:10px;top:6px;z-index:5;font-size:12px;color:var(--mute);pointer-events:none}
   #main{height:52vh}#rsi{height:18vh}#stoch{height:20vh}
-  #cd{position:absolute;left:10px;top:26px;z-index:6;pointer-events:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
-  #cd span{color:var(--mute);font-weight:400}
+  #cd{position:absolute;right:1px;top:0;z-index:6;pointer-events:none;display:none;text-align:center;padding:2px 0;border-radius:2px;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;color:#fff}
   #mtf{position:absolute;right:62px;bottom:34px;z-index:6;pointer-events:none}
   #mtf table{border-collapse:collapse;font-size:11px}
   #mtf th,#mtf td{border:1px solid #0f1318;padding:3px 6px;text-align:center;color:#fff}
@@ -341,6 +340,9 @@ function render(){
       const col=src[i]>ut.ts[i]?'#00e676':src[i]<ut.ts[i]?'#ff1744':null;
       return col?{...x,color:col,wickColor:col,borderColor:col}:x;
     }));
+    const L0=d.length-1;
+    const lc=(S.utOn&&ut.ts[L0]!=null)?(src[L0]>ut.ts[L0]?'#00e676':src[L0]<ut.ts[L0]?'#ff1744':null):null;
+    cache.lastCol=lc||(d[L0].close>=d[L0].open?'#26a69a':'#ef5350');
     const mk=[];
     if(S.utOn) d.forEach((x,i)=>{
       if(ut.buy[i]) mk.push({time:t[i],position:'belowBar',color:'#00c853',shape:'arrowUp',text:'Buy'});
@@ -371,7 +373,7 @@ function render(){
     $('t2').textContent=`Stoch RSI (${S.sr}, ${S.sl}, ${S.sk}, ${S.sd})  — biru: %K, oranye: %D`;
     if(first){ const n=d.length; const rg={from:Math.max(0,n-120),to:n+5}; charts.forEach(x=>x.timeScale().setVisibleLogicalRange(rg)); first=false; }
 
-    tickCd();
+    tickCd(); requestAnimationFrame(placeCd);
     $('mtf').innerHTML = (S.tbOn&&cache.mtf)?tableHTML(S,cache.mtf):'';
     const L=d.length-1, f=v=>v==null?'-':v.toFixed(1);
     if(cache.demo){ st.textContent=`DATA CONTOH (bukan harga asli) · gagal ambil data: ${cache.why}`; return; }
@@ -379,17 +381,29 @@ function render(){
   }catch(e){ st.textContent='Error render: '+e.message; }
 }
 const STEP={'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400};
+function placeCd(){
+  try{
+    const el=$('cd');
+    if(!cache||!cache.d.length){ el.style.display='none'; return; }
+    const y=candle.priceToCoordinate(cache.d[cache.d.length-1].close);
+    if(y==null||isNaN(y)){ el.style.display='none'; return; }
+    let w=64; try{ w=cMain.priceScale('right').width()||64; }catch(e){}
+    el.style.display='block'; el.style.width=w+'px'; el.style.top=(y+12)+'px';
+  }catch(e){}
+}
 function tickCd(){
-  const el=$('cd'); if(!cache||!cache.d.length){ el.innerHTML=''; return; }
+  const el=$('cd'); if(!cache||!cache.d.length){ el.style.display='none'; return; }
   const step=STEP[$('tf').value], last=cache.d[cache.d.length-1], now=Date.now()/1000;
   let nx=last.time+step;
   if(nx<=now) nx+=(Math.floor((now-nx)/step)+1)*step;
   const r=Math.max(0,Math.floor(nx-now)), h=Math.floor(r/3600), m=Math.floor(r%3600/60), sc=r%60;
   const two=n=>String(n).padStart(2,'0');
-  const txt=(h?h+':':'')+two(m)+':'+two(sc);
-  const p=last.close, dec=p<10?5:p<200?3:2;
-  el.innerHTML=`${p.toFixed(dec)} <span>·</span> <b style="color:${r<=10?'#f5b942':'inherit'}">${txt}</b> <span>menuju candle baru</span>`;
+  el.textContent=(h?h+':':'')+two(m)+':'+two(sc);
+  const bg=cache.lastCol||'#26a69a';
+  el.style.background=bg; el.style.color=bg==='#00e676'?'#000':'#fff';
+  placeCd();
 }
+cMain.timeScale().subscribeVisibleLogicalRangeChange(placeCd);
 async function loadData(){
   const st=$('status'); st.textContent='Memuat...';
   try{
