@@ -14,7 +14,11 @@
   input[type=checkbox]{padding:0;width:16px;height:16px;vertical-align:middle}
   button{cursor:pointer}button:hover{border-color:var(--acc)}
   label{color:var(--mute);font-size:12px;white-space:nowrap}
-  #status{margin-left:auto;color:var(--mute);font-size:12px}
+  #ws{margin-left:auto;font-size:12px;color:var(--mute)}
+  #status{color:var(--mute);font-size:12px}
+  .tfbar{display:flex;gap:6px;padding:8px 14px;background:var(--bg);border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+  .tfbar button{min-width:56px;padding:9px 16px;font-size:14px;font-weight:600;color:var(--mute);background:var(--panel)}
+  .tfbar button.on{background:var(--acc);border-color:var(--acc);color:#000}
   details{background:var(--panel);border-bottom:1px solid var(--line);padding:6px 14px}
   summary{cursor:pointer;color:var(--acc);font-size:13px}
   .grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
@@ -43,14 +47,13 @@
       <option value="twelve">Twelve Data XAU/USD (API key gratis)</option>
     </select>
   </label>
-  <label>Simbol <input id="sym" list="syms" value="XAUUSD" style="width:96px"></label>
-  <datalist id="syms"><option>XAUUSD</option><option>XAGUSD</option><option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option><option>AUDUSD</option><option>USDCHF</option><option>USDCAD</option><option>NZDUSD</option><option>USOIL</option><option>BTCUSD</option><option>ETHUSD</option></datalist>
+  <label>Simbol <select id="sym" style="max-width:220px"></select></label>
   <input id="key" type="password" placeholder="Twelve Data API key" style="display:none;width:170px">
-  <label>Timeframe
-    <select id="tf"><option>1m</option><option>5m</option><option>15m</option><option>30m</option><option selected>1h</option><option>4h</option><option>1d</option></select>
-  </label>
-  <span id="status"></span>
+  <span id="ws"></span><span id="status"></span>
 </header>
+<div class="tfbar" id="tfs"><input type="hidden" id="tf" value="1h">
+  <button data-tf="1m">1m</button><button data-tf="5m">5m</button><button data-tf="15m">15m</button><button data-tf="30m">30m</button><button data-tf="1h" class="on">1h</button><button data-tf="4h">4h</button><button data-tf="1d">1d</button>
+</div>
 <details id="cfg" open><summary>Pengaturan indikator</summary>
 <div class="grid">
   <fieldset><legend>UT Bot</legend>
@@ -126,6 +129,58 @@ const $ = id => document.getElementById(id);
 if(typeof LightweightCharts==='undefined'){
   $('status').textContent='Library chart gagal dimuat (cek internet / content blocker Safari)';
   throw new Error('LightweightCharts missing');
+}
+// ---------- daftar simbol (dropdown) ----------
+const P=str=>str.split(',').map(x=>[x,[x.replace('/','')]]);
+const A=(l,...c)=>[l,c];
+const SYM_GROUPS=[
+ ['Forex Majors',P('EUR/USD,GBP/USD,USD/JPY,USD/CHF,AUD/USD,USD/CAD,NZD/USD')],
+ ['Forex Minors',P('EUR/GBP,EUR/JPY,EUR/CHF,EUR/AUD,EUR/CAD,EUR/NZD,GBP/JPY,GBP/CHF,GBP/AUD,GBP/CAD,GBP/NZD,AUD/JPY,AUD/CHF,AUD/CAD,AUD/NZD,CAD/JPY,CAD/CHF,CHF/JPY,NZD/JPY,NZD/CHF,NZD/CAD')],
+ ['Forex Eksotis',P('USD/SGD,USD/HKD,USD/TRY,USD/ZAR,USD/MXN,USD/NOK,USD/SEK,USD/DKK,USD/PLN,USD/CNH,EUR/TRY,EUR/ZAR,EUR/NOK,EUR/SEK,GBP/ZAR')],
+ ['Logam Mulia',P('XAU/USD,XAU/EUR,XAG/USD,XAG/EUR,XPT/USD,XPD/USD')],
+ ['Energi',[A('US Oil / WTI','USOIL','WTI','XTIUSD'),A('UK Oil / Brent','UKOIL','BRENT','XBRUSD'),A('Natural Gas','NGAS','NATGAS','XNGUSD')]],
+ ['Kripto',P('BTC/USD,ETH/USD,LTC/USD,XRP/USD,BCH/USD,ADA/USD,DOT/USD,DOGE/USD,SOL/USD,MATIC/USD,LINK/USD,XLM/USD')],
+ ['Indeks Saham',[A('US30 (Dow Jones)','US30','DJ30','DJI30','WS30'),A('US Tech 100 (Nasdaq)','USTEC','NAS100','US100','USTECH100'),A('USA500 (S&P 500)','US500','SPX500'),A('SmallCap2000 (Russell 2000)','US2000','RUSSELL2000','RTY'),A('GER40 (DAX)','GER40','DE40','DAX40','GER30'),A('UK100 (FTSE)','UK100','FTSE100'),A('FRA40 (CAC)','FRA40','FR40','CAC40'),A('SPA35 (IBEX)','SPA35','ESP35','ES35'),A('EU50 (Euro Stoxx)','EU50','STOXX50','ESTX50'),A('JPN225 (Nikkei)','JPN225','JP225','NIKKEI225'),A('HK50 (Hang Seng)','HK50','HSI','HK33'),A('AUS200 (ASX)','AUS200','AU200','ASX200')]],
+ ['Komoditas Pertanian',[A('Cocoa (Kakao)','COCOA','CC'),A('Coffee (Kopi)','COFFEE','KC'),A('Cotton (Kapas)','COTTON','CT'),A('Copper (Tembaga)','COPPER','XCUUSD','HG'),A('Sugar (Gula)','SUGAR','SB'),A('Wheat (Gandum)','WHEAT','ZW'),A('Corn (Jagung)','CORN','ZC'),A('Soybean (Kedelai)','SOYBEAN','SOYBEANS','ZS')]],
+ ['Saham AS',[A('AAPL (Apple)','AAPL'),A('AMZN (Amazon)','AMZN'),A('TSLA (Tesla)','TSLA'),A('MSFT (Microsoft)','MSFT'),A('GOOG (Alphabet)','GOOG','GOOGL'),A('META (Meta)','META'),A('NVDA (Nvidia)','NVDA'),A('NFLX (Netflix)','NFLX'),A('BABA (Alibaba)','BABA')]],
+ ['Saham Eropa & Inggris',[A('VOW (Volkswagen)','VOW','VOW3','VOWG'),A('BARC (Barclays)','BARC'),A('BMW','BMW','BMWG'),A('LVMH','LVMH','MC'),A('BP','BP'),A('RDSA (Shell)','RDSA','SHEL','SHELL')]],
+ ['Obligasi',[A('Euro Bund','BUND','EUBUND','GER10YR'),A('US 10-year Treasury Note','US10Y','USTBOND','TNOTE','ZN'),A('UK Gilt','UKGILT','GILT')]]
+];
+(function(){
+  const sel=$('sym');
+  SYM_GROUPS.forEach(g=>{
+    const og=document.createElement('optgroup'); og.label=g[0];
+    g[1].forEach(it=>{ const o=document.createElement('option'); o.textContent=it[0]; o.value=it[1][0]; o.dataset.c=it[1].join(','); og.appendChild(o); });
+    sel.appendChild(og);
+  });
+  const oc=document.createElement('option'); oc.value='__custom'; oc.textContent='Ketik sendiri...'; sel.appendChild(oc);
+  sel.value='XAUUSD';
+})();
+let prevSym='XAUUSD';
+function onSymChange(){
+  const sel=$('sym');
+  if(sel.value==='__custom'){
+    const v=(prompt('Ketik simbol biquote, contoh: EURUSD atau US30')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!v){ sel.value=prevSym; return false; }
+    let o=[...sel.options].find(x=>x.value===v);
+    if(!o){ o=document.createElement('option'); o.value=v; o.textContent=v+' (kustom)'; sel.insertBefore(o,sel.lastChild); }
+    sel.value=v;
+  }
+  prevSym=sel.value; return true;
+}
+// cocokkan dengan simbol yang benar-benar ada di biquote; yang tidak ada dinonaktifkan
+async function checkSymbols(){
+  try{
+    const r=await fetch('https://biquote.io/api/symbols?quotedWithinDays=7'); if(!r.ok) return;
+    const j=await r.json(); const arr=Array.isArray(j)?j:(j.items||j.symbols||j.data||[]);
+    const names=new Set(arr.map(x=>String(x.name||x.symbol||x).toUpperCase()));
+    if(names.size<20) return;
+    [...$('sym').options].forEach(o=>{
+      if(!o.dataset||!o.dataset.c) return;
+      const hit=o.dataset.c.split(',').find(c=>names.has(c));
+      if(hit) o.value=hit; else { o.disabled=true; if(!/tidak tersedia/.test(o.textContent)) o.textContent+=' (tidak tersedia)'; }
+    });
+  }catch(e){}
 }
 const opts = () => ({
   autoSize: true,
@@ -470,6 +525,7 @@ async function loadData(){
   try{
     const tf=$('tf').value, src=$('src').value, s=sym();
     $('ttl').textContent=src==='binance'?'PAXG/USDT':s;
+    ensureWs();
     if(src==='twelve'&&!$('key').value) throw new Error('Isi API key Twelve Data dulu');
     try{localStorage.setItem('xau_key',$('key').value);}catch(e){}
     let d, mtf=null, demo=false, why='';
@@ -486,12 +542,81 @@ async function loadData(){
     render();
   }catch(e){ st.textContent='Gagal: '+e.message; }
 }
-// harga live: 300 request/menit (tiap 200 ms), maksimal 4 request berjalan bersamaan
+// ---------- harga live ----------
+let livePend=false;
+function applyPrice(p){
+  if(!(p>0)||!cache||cache.demo) return;
+  const last=cache.d[cache.d.length-1], now=Date.now()/1000, step=STEP[$('tf').value];
+  if(now>=last.time+step){ if(cache.rolled!==last.time){ cache.rolled=last.time; loadData(); } return; }
+  if(p===last.close) return;
+  last.close=p; last.high=Math.max(last.high,p); last.low=Math.min(last.low,p);
+  if(!livePend){ livePend=true; requestAnimationFrame(()=>{ livePend=false; render(true); }); }
+}
+// WebSocket: biquote lewat SignalR, Binance lewat WebSocket biasa
+let ws=null, hub=null, wsKey='', wsOk=false, srPromise=null;
+function setWs(ok,txt){ wsOk=ok; const e=$('ws'); e.textContent=txt; e.style.color=ok?'#26a69a':'#f5b942'; }
+function stopWs(){
+  try{ if(ws){ ws.onclose=null; ws.close(); } }catch(e){} ws=null;
+  try{ if(hub) hub.stop(); }catch(e){} hub=null; wsKey='';
+}
+function loadSignalR(){
+  if(window.signalR) return Promise.resolve();
+  if(srPromise) return srPromise;
+  const urls=['https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js',
+    'https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js',
+    'https://unpkg.com/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js'];
+  srPromise=new Promise((res,rej)=>{
+    const next=i=>{
+      if(window.signalR) return res();
+      if(i>=urls.length){ srPromise=null; return rej(new Error('signalr')); }
+      const sc=document.createElement('script'); sc.src=urls[i]; sc.onload=()=>res(); sc.onerror=()=>next(i+1);
+      document.head.appendChild(sc);
+    };
+    next(0);
+  });
+  return srPromise;
+}
+const BN_WS=['wss://stream.binance.com:9443','wss://data-stream.binance.vision'];
+function openBinanceWs(key,i){
+  if(i>=BN_WS.length){ setWs(false,'○ polling'); return; }
+  let w; try{ w=new WebSocket(BN_WS[i]+'/ws/paxgusdt@trade'); }catch(e){ return openBinanceWs(key,i+1); }
+  ws=w; let opened=false;
+  w.onopen=()=>{ opened=true; setWs(true,'● WebSocket'); };
+  w.onmessage=e=>{ try{ if(wsKey===key) applyPrice(+JSON.parse(e.data).p); }catch(x){} };
+  w.onclose=()=>{
+    if(wsKey!==key) return; setWs(false,'○ polling');
+    if(!opened) openBinanceWs(key,i+1); else setTimeout(()=>{ if(wsKey===key) openBinanceWs(key,i); },2000);
+  };
+}
+function openBiquoteWs(s,key){
+  loadSignalR().then(()=>{
+    if(wsKey!==key) return;
+    const h=new signalR.HubConnectionBuilder().withUrl('https://biquote.io/hubs/tick').withAutomaticReconnect().build();
+    hub=h;
+    h.on('ReceiveTick',t=>{
+      if(wsKey!==key||!t||String(t.symbol).toUpperCase()!==s||t.marketState==='closed') return;
+      applyPrice(+(t.bid>0?t.bid:t.mid));
+    });
+    h.onreconnecting(()=>setWs(false,'○ menyambung...'));
+    h.onreconnected(()=>{ setWs(true,'● WebSocket'); h.invoke('Subscribe',[s]).catch(()=>{}); });
+    h.onclose(()=>{ if(wsKey===key) setWs(false,'○ polling'); });
+    return h.start().then(()=>h.invoke('Subscribe',[s])).then(()=>{ if(wsKey===key) setWs(true,'● WebSocket'); });
+  }).catch(()=>{ if(wsKey===key) setWs(false,'○ polling'); });
+}
+function ensureWs(){
+  const src=$('src').value, s=sym();
+  if(src==='twelve'){ stopWs(); $('ws').textContent=''; wsOk=false; return; }
+  const key=src+':'+(src==='binance'?'PAXG':s);
+  if(key===wsKey) return;
+  stopWs(); wsKey=key; setWs(false,'○ menyambung...');
+  if(src==='binance') openBinanceWs(key,0); else openBiquoteWs(s,key);
+}
+// cadangan: polling 300 request/menit (tiap 200 ms) hanya saat WebSocket tidak tersambung
 const LIVE_MS=200;
-let liveSeq=0, liveApplied=0, liveInflight=0, livePend=false;
+let liveSeq=0, liveApplied=0, liveInflight=0;
 async function liveTick(){
   const src=$('src').value;
-  if(liveInflight>=4||!cache||cache.demo||src==='twelve'||document.hidden) return;
+  if(wsOk||liveInflight>=4||!cache||cache.demo||src==='twelve'||document.hidden) return;
   const my=++liveSeq; liveInflight++;
   try{
     let p;
@@ -506,24 +631,26 @@ async function liveTick(){
       if(!r.ok) return;
       p=+(await r.json()).price;
     }
-    if(!(p>0)||!cache||my<liveApplied) return;   // buang respons yang datang terlambat
-    liveApplied=my;
-    const last=cache.d[cache.d.length-1], now=Date.now()/1000, step=STEP[$('tf').value];
-    if(now>=last.time+step){ if(cache.rolled!==last.time){ cache.rolled=last.time; loadData(); } return; }
-    if(p===last.close) return;
-    last.close=p; last.high=Math.max(last.high,p); last.low=Math.min(last.low,p);
-    if(!livePend){ livePend=true; requestAnimationFrame(()=>{ livePend=false; render(true); }); }
+    if(my<liveApplied) return;
+    liveApplied=my; applyPrice(p);
   }catch(e){} finally{ liveInflight--; }
 }
 setInterval(liveTick,LIVE_MS);
 let dtm;
 const trig=()=>{ first=true; clearTimeout(dtm); dtm=setTimeout(loadData,150); };
-['tf','sym','src','key'].forEach(id=>['change','input'].forEach(ev=>$(id).addEventListener(ev,()=>{
+['sym','src','key'].forEach(id=>['change','input'].forEach(ev=>$(id).addEventListener(ev,()=>{
+  if(id==='sym'&&!onSymChange()) return;
   if(id==='src') $('key').style.display=$('src').value==='twelve'?'':'none';
   if(id==='key'&&$('src').value!=='twelve') return;
   trig();
 })));
 $('cfg').addEventListener('change',e=>{ if(e.target.id==='tbOn'&&K('tbOn')&&cache&&!cache.mtf) loadData(); else render(); });
+document.querySelectorAll('#tfs button').forEach(b=>b.onclick=()=>{
+  $('tf').value=b.dataset.tf;
+  document.querySelectorAll('#tfs button').forEach(x=>x.classList.toggle('on',x===b));
+  trig();
+});
+checkSymbols();
 try{ $('key').value=localStorage.getItem('xau_key')||''; }catch(e){}
 loadData();
 setInterval(tickCd,1000);
