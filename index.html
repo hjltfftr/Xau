@@ -24,7 +24,7 @@
   .wrap{padding:8px 10px}
   .pane{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
   .tag{position:absolute;left:10px;top:6px;z-index:5;font-size:12px;color:var(--mute);pointer-events:none}
-  #main{height:52vh}#rsi{height:18vh}#stoch{height:20vh}
+  #main{height:50vh}#harsi{height:32vh}
   #cd{position:absolute;right:1px;top:0;z-index:6;pointer-events:none;display:none;text-align:center;padding:2px 0;border-radius:2px;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;color:#fff}
   #mtf{position:absolute;right:62px;bottom:34px;z-index:6;pointer-events:none}
   #mtf table{border-collapse:collapse;font-size:11px}
@@ -49,7 +49,6 @@
   <label>Timeframe
     <select id="tf"><option>1m</option><option>5m</option><option>15m</option><option>30m</option><option selected>1h</option><option>4h</option><option>1d</option></select>
   </label>
-  <button id="go">Muat</button>
   <span id="status"></span>
 </header>
 <details id="cfg" open><summary>Pengaturan indikator</summary>
@@ -60,14 +59,40 @@
     <label>ATR <input id="uc" type="number" value="10"></label>
     <label><input id="ha" type="checkbox"> Heikin Ashi</label>
   </fieldset>
-  <fieldset><legend>StochRSI</legend>
+  <fieldset><legend>Tabel MTF: StochRSI</legend>
     <label>RSI <input id="sr" type="number" value="14"></label>
     <label>Stoch <input id="sl" type="number" value="5"></label>
     <label>K <input id="sk" type="number" value="3"></label>
     <label>D <input id="sd" type="number" value="3"></label>
   </fieldset>
-  <fieldset><legend>RSI</legend>
+  <fieldset><legend>Tabel MTF: RSI</legend>
     <label>Panjang <input id="rl" type="number" value="14"></label>
+  </fieldset>
+  <fieldset><legend>HARSI (panel bawah)</legend>
+    <label>Panjang <input id="hLen" type="number" value="14"></label>
+    <label>Smoothing open <input id="hSm" type="number" value="1"></label>
+    <label>RSI <input id="hRL" type="number" value="7"></label>
+    <label><input id="hMode" type="checkbox" checked> RSI smoothed</label>
+    <label><input id="hPlot" type="checkbox" checked> Garis RSI</label>
+    <label><input id="hHist" type="checkbox" checked> Histogram</label>
+  </fieldset>
+  <fieldset><legend>Stoch RSI klasik (panel bawah)</legend>
+    <label><input id="xShow" type="checkbox" checked> Tampil</label>
+    <label>RSI <input id="xRsi" type="number" value="5"></label>
+    <label>Stoch <input id="xSto" type="number" value="14"></label>
+    <label>K <input id="xK" type="number" value="3"></label>
+    <label>D <input id="xD" type="number" value="3"></label>
+    <label>OB <input id="xOB" type="number" value="80"></label>
+    <label>OS <input id="xOS" type="number" value="20"></label>
+    <label>Skala % <input id="xSc" type="number" value="100"></label>
+    <label><input id="xSig" type="checkbox" checked> Panah GC/DC</label>
+    <label><input id="xZone" type="checkbox"> GC/DC hanya di zona OS/OB</label>
+  </fieldset>
+  <fieldset><legend>Batas HARSI</legend>
+    <label>OB <input id="lOB" type="number" value="20"></label>
+    <label>OB ekstrem <input id="lOBx" type="number" value="30"></label>
+    <label>OS <input id="lOS" type="number" value="-20"></label>
+    <label>OS ekstrem <input id="lOSx" type="number" value="-30"></label>
   </fieldset>
   <fieldset><legend>Bollinger</legend>
     <label><input id="bbOn" type="checkbox" checked> Tampil</label>
@@ -91,8 +116,7 @@
 </details>
 <div class="wrap">
   <div class="pane"><div class="tag" id="t0">Harga</div><div id="main"></div><div id="cd"></div><div id="mtf"></div></div>
-  <div class="pane"><div class="tag" id="t1">RSI</div><div id="rsi"></div></div>
-  <div class="pane"><div class="tag" id="t2">Stoch RSI</div><div id="stoch"></div></div>
+  <div class="pane"><div class="tag" id="t1">HARSI</div><div id="harsi"></div></div>
   <div class="note">biquote mengambil harga dari feed MetaTrader 5 sebuah broker, jadi bisa sedikit berbeda dari TradingView. Simbol berlaku untuk biquote dan Twelve Data; Binance selalu PAXG/USDT (token emas). Candle mingguan di biquote dihitung dari candle harian. Bukan saran investasi.</div>
 </div>
 
@@ -112,24 +136,25 @@ const opts = () => ({
   crosshair:{mode:0}
 });
 const cMain = LightweightCharts.createChart($('main'), opts());
-const cRsi  = LightweightCharts.createChart($('rsi'), opts());
-const cSt   = LightweightCharts.createChart($('stoch'), opts());
+const cH    = LightweightCharts.createChart($('harsi'), opts());
 const candle = cMain.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderVisible:false,wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
 const ln=(c,color,w)=>c.addLineSeries({color,lineWidth:w||1,priceLineVisible:false,lastValueVisible:false});
 const bbM=ln(cMain,'#ff9800',1), bbU=ln(cMain,'#2196f3',1), bbL=ln(cMain,'#2196f3',1), maS=ln(cMain,'#ffeb3b',2);
-const rsiS = cRsi.addLineSeries({color:'#b388ff',lineWidth:2,priceLineVisible:false});
-const kS = cSt.addLineSeries({color:'#2196f3',lineWidth:2,priceLineVisible:false});
-const dS = cSt.addLineSeries({color:'#ff9800',lineWidth:2,priceLineVisible:false});
-[80,50,20].forEach(v=>{
-  rsiS.createPriceLine({price:v,color:'#4a5568',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''});
-  kS.createPriceLine({price:v,color:'#4a5568',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''});
-});
-const fix=()=>({priceRange:{minValue:0,maxValue:100}});
-rsiS.applyOptions({autoscaleInfoProvider:fix});
-kS.applyOptions({autoscaleInfoProvider:fix});
+const hHist=cH.addHistogramSeries({color:'rgba(192,192,192,0.22)',priceLineVisible:false,lastValueVisible:false});
+const hCand=cH.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderUpColor:'#26a69a',borderDownColor:'#ef5350',wickUpColor:'#787b86',wickDownColor:'#787b86',priceLineVisible:false,lastValueVisible:false,
+  autoscaleInfoProvider:()=>({priceRange:{minValue:-55,maxValue:55}})});
+const hRsi=cH.addLineSeries({color:'#fac832',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+const sxK=cH.addLineSeries({color:'#00b0ff',lineWidth:2,priceLineVisible:false,lastValueVisible:false});
+const sxD=cH.addLineSeries({color:'#ff9800',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+let lvl=[];
+function setLevels(S){
+  lvl.forEach(l=>{ try{hCand.removePriceLine(l);}catch(e){} }); lvl=[];
+  [[S.lOBx,'rgba(192,192,192,0.5)',0],[S.lOB,'rgba(192,192,192,0.3)',0],[0,'#ff9800',1],[S.lOS,'rgba(192,192,192,0.3)',0],[S.lOSx,'rgba(192,192,192,0.5)',0]]
+    .forEach(a=>lvl.push(hCand.createPriceLine({price:a[0],color:a[1],lineWidth:1,lineStyle:a[2],axisLabelVisible:false,title:''})));
+}
 
 let lock=false;
-const charts=[cMain,cRsi,cSt];
+const charts=[cMain,cH];
 charts.forEach(c=>c.timeScale().subscribeVisibleLogicalRangeChange(r=>{
   if(lock||!r) return; lock=true;
   charts.forEach(o=>{ if(o!==c) o.timeScale().setVisibleLogicalRange(r); });
@@ -139,7 +164,10 @@ charts.forEach(c=>c.timeScale().subscribeVisibleLogicalRangeChange(r=>{
 // ---------- indikator ----------
 const N=id=>+$(id).value, K=id=>$(id).checked;
 const cfg=()=>({utOn:K('utOn'),ua:N('ua'),uc:N('uc'),ha:K('ha'),sr:N('sr'),sl:N('sl'),sk:N('sk'),sd:N('sd'),rl:N('rl'),
-  bbOn:K('bbOn'),bl:N('bl'),bm:N('bm'),maOn:K('maOn'),ml:N('ml'),mt:$('mt').value,stOn:K('stOn'),sf:N('sf'),sp:N('sp'),tbOn:K('tbOn')});
+  bbOn:K('bbOn'),bl:N('bl'),bm:N('bm'),maOn:K('maOn'),ml:N('ml'),mt:$('mt').value,stOn:K('stOn'),sf:N('sf'),sp:N('sp'),tbOn:K('tbOn'),
+  hLen:N('hLen'),hSm:Math.max(1,N('hSm')),hRL:N('hRL'),hMode:K('hMode'),hPlot:K('hPlot'),hHist:K('hHist'),
+  xShow:K('xShow'),xRsi:N('xRsi'),xSto:N('xSto'),xK:N('xK'),xD:N('xD'),xOB:N('xOB'),xOS:N('xOS'),xSc:N('xSc'),xSig:K('xSig'),xZone:K('xZone'),
+  lOB:N('lOB'),lOBx:N('lOBx'),lOS:N('lOS'),lOSx:N('lOSx')});
 function rma(a,n){
   const out=Array(a.length).fill(null);
   if(a.length<n||n<1) return out;
@@ -327,8 +355,8 @@ function demoData(tf){
 }
 
 // ---------- render ----------
-let cache=null, first=true;
-function render(){
+let cache=null, first=true, reqId=0;
+function render(live){
   if(!cache) return;
   const st=$('status');
   try{
@@ -367,17 +395,49 @@ function render(){
     maS.setData(toSeries(t,S.mt==='SMA'?sma(c,S.ml):ema(c,S.ml)));
     maS.applyOptions({visible:S.maOn});
 
-    const r=calcRSI(c,S.rl), k=sma(stochRSI(calcRSI(c,S.sr),S.sl),S.sk), dd=sma(k,S.sd);
-    rsiS.setData(toSeries(t,r)); kS.setData(toSeries(t,k)); dS.setData(toSeries(t,dd));
-    $('t1').textContent=`RSI (${S.rl})`;
-    $('t2').textContent=`Stoch RSI (${S.sr}, ${S.sl}, ${S.sk}, ${S.sd})  — biru: %K, oranye: %D`;
+    // ---- HARSI (port dari Pine "Heikin Ashi RSI Oscillator") ----
+    const n=d.length, hi=d.map(x=>x.high), lo=d.map(x=>x.low), o4=d.map(x=>(x.open+x.high+x.low+x.close)/4);
+    const zr=(a,len)=>calcRSI(a,len).map(v=>v==null?null:v-50);
+    const cR=zr(c,S.hLen), hR=zr(hi,S.hLen), lR=zr(lo,S.hLen);
+    const HO=Array(n).fill(null), HH=Array(n).fill(null), HL=Array(n).fill(null), HC=Array(n).fill(null);
+    for(let i=0;i<n;i++){
+      if(cR[i]==null||hR[i]==null||lR[i]==null) continue;
+      const oR=(i>0&&cR[i-1]!=null)?cR[i-1]:cR[i];
+      const hh=Math.max(hR[i],lR[i]), ll=Math.min(hR[i],lR[i]);
+      const cl=(oR+hh+ll+cR[i])/4, j=i-S.hSm;
+      const op=(j<0||HO[j]==null)?(oR+cR[i])/2:(HO[i-1]*S.hSm+HC[i-1])/(S.hSm+1);
+      HO[i]=op; HC[i]=cl; HH[i]=Math.max(hh,op,cl); HL[i]=Math.min(ll,op,cl);
+    }
+    hCand.setData(t.map((x,i)=>HO[i]==null?{time:x}:{time:x,open:HO[i],high:HH[i],low:HL[i],close:HC[i]}));
+    // RSI (ohlc4), opsional smoothed
+    const zo=zr(o4,S.hRL), rsiSm=Array(n).fill(null);
+    for(let i=0;i<n;i++){ if(zo[i]==null) continue; rsiSm[i]=(S.hMode&&i>0&&rsiSm[i-1]!=null)?(rsiSm[i-1]+zo[i])/2:zo[i]; }
+    hRsi.setData(toSeries(t,rsiSm));
+    hHist.setData(toSeries(t,rsiSm));
+    hRsi.applyOptions({visible:S.hPlot}); hHist.applyOptions({visible:S.hHist});
+    // Stoch RSI klasik, digeser ke -50..+50 dan diskalakan
+    const sk=sma(stochRSI(calcRSI(c,S.xRsi),S.xSto),S.xK), sdd=sma(sk,S.xD);
+    const zs=v=>v==null?null:((v-50)/100)*S.xSc;
+    sxK.setData(t.map((x,i)=>sk[i]==null?{time:x}:{time:x,value:zs(sk[i]),color:sk[i]>=S.xOB?'#ff1744':sk[i]<=S.xOS?'#00e676':'#00b0ff'}));
+    sxD.setData(toSeries(t,sdd.map(zs)));
+    sxK.applyOptions({visible:S.xShow}); sxD.applyOptions({visible:S.xShow});
+    const mk2=[];
+    if(S.xShow&&S.xSig) for(let i=1;i<n;i++){
+      if(sk[i]==null||sdd[i]==null||sk[i-1]==null||sdd[i-1]==null) continue;
+      const gc=sk[i]>sdd[i]&&sk[i-1]<=sdd[i-1], dc=sk[i]<sdd[i]&&sk[i-1]>=sdd[i-1];
+      if(gc&&(!S.xZone||sk[i]<=S.xOS+10)) mk2.push({time:t[i],position:'belowBar',color:'#00e676',shape:'arrowUp',text:''});
+      if(dc&&(!S.xZone||sk[i]>=S.xOB-10)) mk2.push({time:t[i],position:'aboveBar',color:'#ff1744',shape:'arrowDown',text:''});
+    }
+    sxK.setMarkers(mk2);
+    setLevels(S);
+    $('t1').textContent=`HARSI • (${S.hLen}, ${S.hSm}) · RSI ${S.hRL} kuning · Stoch RSI ${S.xRsi}/${S.xSto}/${S.xK}/${S.xD}: K berwarna, D oranye`;
     if(first){ const n=d.length; const rg={from:Math.max(0,n-120),to:n+5}; charts.forEach(x=>x.timeScale().setVisibleLogicalRange(rg)); first=false; }
 
     tickCd(); requestAnimationFrame(placeCd);
-    $('mtf').innerHTML = (S.tbOn&&cache.mtf)?tableHTML(S,cache.mtf):'';
+    if(!live) $('mtf').innerHTML = (S.tbOn&&cache.mtf)?tableHTML(S,cache.mtf):'';
     const L=d.length-1, f=v=>v==null?'-':v.toFixed(1);
     if(cache.demo){ st.textContent=`DATA CONTOH (bukan harga asli) · gagal ambil data: ${cache.why}`; return; }
-    st.textContent=`Close ${d[L].close.toFixed(2)} · UT ${ut.pos[L]===1?'Buy':ut.pos[L]===-1?'Sell':'-'} · RSI ${f(r[L])} · %K ${f(k[L])} · %D ${f(dd[L])}`;
+    st.textContent=`Close ${d[L].close.toFixed(2)} · UT ${ut.pos[L]===1?'Buy':ut.pos[L]===-1?'Sell':'-'} · RSI ${f(rsiSm[L]==null?null:rsiSm[L]+50)} · SRSI %K ${f(sk[L])} · %D ${f(sdd[L])}`;
   }catch(e){ st.textContent='Error render: '+e.message; }
 }
 const STEP={'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400};
@@ -405,6 +465,7 @@ function tickCd(){
 }
 cMain.timeScale().subscribeVisibleLogicalRangeChange(placeCd);
 async function loadData(){
+  const my=++reqId;
   const st=$('status'); st.textContent='Memuat...';
   try{
     const tf=$('tf').value, src=$('src').value, s=sym();
@@ -420,14 +481,46 @@ async function loadData(){
         if(K('tbOn')) mtf=await Promise.all(TFS.map(x=>get(x[1],500).catch(()=>null)));
       }
     }catch(e){ d=demoData(tf); demo=true; why=e.message; mtf=null; }
+    if(my!==reqId) return;
     cache={d,mtf,demo,why};
     render();
   }catch(e){ st.textContent='Gagal: '+e.message; }
 }
-$('sym').onchange=()=>{first=true;loadData();};
-$('src').onchange=()=>{ $('key').style.display=$('src').value==='twelve'?'':'none'; first=true; loadData(); };
-$('go').onclick=loadData;
-$('tf').onchange=()=>{first=true;loadData();};
+// harga live: ambil tick terbaru tiap 1 detik dan gerakkan candle terakhir
+let liveBusy=false;
+async function liveTick(){
+  const src=$('src').value;
+  if(liveBusy||!cache||cache.demo||src==='twelve'||document.hidden) return;
+  liveBusy=true;
+  try{
+    let p;
+    if(src==='biquote'){
+      const r=await fetch('https://biquote.io/api/'+sym());
+      if(!r.ok) return;
+      const j=await r.json();
+      if(j.marketState==='closed') return;
+      p=+(j.bid>0?j.bid:j.mid);
+    } else {
+      const r=await fetch(`https://${okHost||'api.binance.com'}/api/v3/ticker/price?symbol=PAXGUSDT`);
+      if(!r.ok) return;
+      p=+(await r.json()).price;
+    }
+    if(!(p>0)||!cache) return;
+    const last=cache.d[cache.d.length-1], now=Date.now()/1000, step=STEP[$('tf').value];
+    if(now>=last.time+step){ if(cache.rolled!==last.time){ cache.rolled=last.time; loadData(); } return; }
+    if(p===last.close) return;
+    last.close=p; last.high=Math.max(last.high,p); last.low=Math.min(last.low,p);
+    render(true);
+  }catch(e){} finally{ liveBusy=false; }
+}
+setInterval(liveTick,1000);
+let dtm;
+const trig=()=>{ first=true; clearTimeout(dtm); dtm=setTimeout(loadData,150); };
+['tf','sym','src','key'].forEach(id=>['change','input'].forEach(ev=>$(id).addEventListener(ev,()=>{
+  if(id==='src') $('key').style.display=$('src').value==='twelve'?'':'none';
+  if(id==='key'&&$('src').value!=='twelve') return;
+  trig();
+})));
 $('cfg').addEventListener('change',e=>{ if(e.target.id==='tbOn'&&K('tbOn')&&cache&&!cache.mtf) loadData(); else render(); });
 try{ $('key').value=localStorage.getItem('xau_key')||''; }catch(e){}
 loadData();
