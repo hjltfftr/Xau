@@ -25,6 +25,8 @@
   .pane{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
   .tag{position:absolute;left:10px;top:6px;z-index:5;font-size:12px;color:var(--mute);pointer-events:none}
   #main{height:52vh}#rsi{height:18vh}#stoch{height:20vh}
+  #cd{position:absolute;left:10px;top:26px;z-index:6;pointer-events:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
+  #cd span{color:var(--mute);font-weight:400}
   #mtf{position:absolute;right:62px;bottom:34px;z-index:6;pointer-events:none}
   #mtf table{border-collapse:collapse;font-size:11px}
   #mtf th,#mtf td{border:1px solid #0f1318;padding:3px 6px;text-align:center;color:#fff}
@@ -89,7 +91,7 @@
 </div>
 </details>
 <div class="wrap">
-  <div class="pane"><div class="tag" id="t0">Harga</div><div id="main"></div><div id="mtf"></div></div>
+  <div class="pane"><div class="tag" id="t0">Harga</div><div id="main"></div><div id="cd"></div><div id="mtf"></div></div>
   <div class="pane"><div class="tag" id="t1">RSI</div><div id="rsi"></div></div>
   <div class="pane"><div class="tag" id="t2">Stoch RSI</div><div id="stoch"></div></div>
   <div class="note">biquote mengambil harga dari feed MetaTrader 5 sebuah broker, jadi bisa sedikit berbeda dari TradingView. Simbol berlaku untuk biquote dan Twelve Data; Binance selalu PAXG/USDT (token emas). Candle mingguan di biquote dihitung dari candle harian. Bukan saran investasi.</div>
@@ -369,11 +371,24 @@ function render(){
     $('t2').textContent=`Stoch RSI (${S.sr}, ${S.sl}, ${S.sk}, ${S.sd})  — biru: %K, oranye: %D`;
     if(first){ const n=d.length; const rg={from:Math.max(0,n-120),to:n+5}; charts.forEach(x=>x.timeScale().setVisibleLogicalRange(rg)); first=false; }
 
+    tickCd();
     $('mtf').innerHTML = (S.tbOn&&cache.mtf)?tableHTML(S,cache.mtf):'';
     const L=d.length-1, f=v=>v==null?'-':v.toFixed(1);
     if(cache.demo){ st.textContent=`DATA CONTOH (bukan harga asli) · gagal ambil data: ${cache.why}`; return; }
     st.textContent=`Close ${d[L].close.toFixed(2)} · UT ${ut.pos[L]===1?'Buy':ut.pos[L]===-1?'Sell':'-'} · RSI ${f(r[L])} · %K ${f(k[L])} · %D ${f(dd[L])}`;
   }catch(e){ st.textContent='Error render: '+e.message; }
+}
+const STEP={'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400};
+function tickCd(){
+  const el=$('cd'); if(!cache||!cache.d.length){ el.innerHTML=''; return; }
+  const step=STEP[$('tf').value], last=cache.d[cache.d.length-1], now=Date.now()/1000;
+  let nx=last.time+step;
+  if(nx<=now) nx+=(Math.floor((now-nx)/step)+1)*step;
+  const r=Math.max(0,Math.floor(nx-now)), h=Math.floor(r/3600), m=Math.floor(r%3600/60), sc=r%60;
+  const two=n=>String(n).padStart(2,'0');
+  const txt=(h?h+':':'')+two(m)+':'+two(sc);
+  const p=last.close, dec=p<10?5:p<200?3:2;
+  el.innerHTML=`${p.toFixed(dec)} <span>·</span> <b style="color:${r<=10?'#f5b942':'inherit'}">${txt}</b> <span>menuju candle baru</span>`;
 }
 async function loadData(){
   const st=$('status'); st.textContent='Memuat...';
@@ -402,6 +417,7 @@ $('tf').onchange=()=>{first=true;loadData();};
 $('cfg').addEventListener('change',e=>{ if(e.target.id==='tbOn'&&K('tbOn')&&cache&&!cache.mtf) loadData(); else render(); });
 try{ $('key').value=localStorage.getItem('xau_key')||''; }catch(e){}
 loadData();
+setInterval(tickCd,1000);
 let tick=0;
 setInterval(()=>{ if($('src').value!=='twelve'||++tick%4===0) loadData(); },30000);
 }
