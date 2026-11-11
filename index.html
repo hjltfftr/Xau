@@ -34,13 +34,16 @@
 </head>
 <body>
 <header>
-  <h1>XAU/USD</h1>
+  <h1 id="ttl">XAUUSD</h1>
   <label>Sumber
     <select id="src">
+      <option value="biquote">biquote (gratis, tanpa key, forex + emas spot)</option>
       <option value="binance">Binance PAXG/USDT (tanpa API key)</option>
       <option value="twelve">Twelve Data XAU/USD (API key gratis)</option>
     </select>
   </label>
+  <label>Simbol <input id="sym" list="syms" value="XAUUSD" style="width:96px"></label>
+  <datalist id="syms"><option>XAUUSD</option><option>XAGUSD</option><option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option><option>AUDUSD</option><option>USDCHF</option><option>USDCAD</option><option>NZDUSD</option><option>USOIL</option><option>BTCUSD</option><option>ETHUSD</option></datalist>
   <input id="key" type="password" placeholder="Twelve Data API key" style="display:none;width:170px">
   <label>Timeframe
     <select id="tf"><option>1m</option><option>5m</option><option>15m</option><option>30m</option><option selected>1h</option><option>4h</option><option>1d</option></select>
@@ -81,7 +84,7 @@
     <label>ATR <input id="sp" type="number" value="10"></label>
   </fieldset>
   <fieldset><legend>Tabel MTF</legend>
-    <label><input id="tbOn" type="checkbox" checked> Tampil (Binance saja)</label>
+    <label><input id="tbOn" type="checkbox" checked> Tampil (biquote &amp; Binance)</label>
   </fieldset>
 </div>
 </details>
@@ -89,7 +92,7 @@
   <div class="pane"><div class="tag" id="t0">Harga</div><div id="main"></div><div id="mtf"></div></div>
   <div class="pane"><div class="tag" id="t1">RSI</div><div id="rsi"></div></div>
   <div class="pane"><div class="tag" id="t2">Stoch RSI</div><div id="stoch"></div></div>
-  <div class="note">PAXG adalah token emas yang harganya sangat dekat XAU/USD, tapi bukan harga spot yang persis sama. Untuk XAU/USD asli pilih Twelve Data. Bukan saran investasi.</div>
+  <div class="note">biquote mengambil harga dari feed MetaTrader 5 sebuah broker, jadi bisa sedikit berbeda dari TradingView. Simbol berlaku untuk biquote dan Twelve Data; Binance selalu PAXG/USDT (token emas). Candle mingguan di biquote dihitung dari candle harian. Bukan saran investasi.</div>
 </div>
 
 <script>
@@ -279,9 +282,30 @@ async function fetchBinance(tf,limit){
   }
   throw new Error('Semua server Binance gagal ('+err.message+')');
 }
-async function fetchTwelve(tf,key){
+const sym=()=>($('sym').value||'XAUUSD').toUpperCase().replace(/[^A-Z0-9]/g,'');
+async function fetchBiquote(s,tf,limit){
+  const wk=tf==='1w';
+  const r=await fetch(`https://biquote.io/api/${s}/ohlc?interval=${wk?'1d':tf}&limit=${wk?1000:limit}`);
+  if(!r.ok){ let m=''; try{ m=(await r.json()).message; }catch(e){} throw new Error('biquote '+r.status+(m?': '+m:'')); }
+  const j=await r.json();
+  let d=(j.bars||[]).map(b=>({time:Math.floor(Date.parse(b.openTime)/1000),open:+b.open,high:+b.high,low:+b.low,close:+b.close}))
+    .sort((a,b)=>a.time-b.time).filter((x,i,a)=>!i||x.time>a[i-1].time);
+  if(wk){
+    const w=[];
+    d.forEach(x=>{
+      const t2=x.time+14400, dow=(new Date(t2*1000).getUTCDay()+6)%7;
+      const start=Math.floor(t2/86400)*86400-dow*86400-14400, l=w[w.length-1];
+      if(l&&l.time===start){ l.high=Math.max(l.high,x.high); l.low=Math.min(l.low,x.low); l.close=x.close; }
+      else w.push({time:start,open:x.open,high:x.high,low:x.low,close:x.close});
+    });
+    d=w;
+  }
+  if(!d.length) throw new Error('biquote: data kosong untuk '+s);
+  return d;
+}
+async function fetchTwelve(tf,key,s){
   const iv={'1m':'1min','5m':'5min','15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'}[tf];
-  const r=await fetch(`https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=${iv}&outputsize=1000&apikey=${encodeURIComponent(key)}`);
+  const r=await fetch(`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(s.length===6?s.slice(0,3)+'/'+s.slice(3):s)}&interval=${iv}&outputsize=1000&apikey=${encodeURIComponent(key)}`);
   const j=await r.json();
   if(j.status==='error'||!j.values) throw new Error(j.message||'Twelve Data error');
   return j.values.reverse().map(v=>{
@@ -354,20 +378,24 @@ function render(){
 async function loadData(){
   const st=$('status'); st.textContent='Memuat...';
   try{
-    const tf=$('tf').value, src=$('src').value;
+    const tf=$('tf').value, src=$('src').value, s=sym();
+    $('ttl').textContent=src==='binance'?'PAXG/USDT':s;
     if(src==='twelve'&&!$('key').value) throw new Error('Isi API key Twelve Data dulu');
     try{localStorage.setItem('xau_key',$('key').value);}catch(e){}
     let d, mtf=null, demo=false, why='';
     try{
-      if(src==='binance'){
-        d=await fetchBinance(tf,1000);
-        if(K('tbOn')) mtf=await Promise.all(TFS.map(x=>fetchBinance(x[1],500).catch(()=>null)));
-      } else d=await fetchTwelve(tf,$('key').value);
+      if(src==='twelve') d=await fetchTwelve(tf,$('key').value,s);
+      else {
+        const get=(t,l)=>src==='binance'?fetchBinance(t,l):fetchBiquote(s,t,l);
+        d=await get(tf,1000);
+        if(K('tbOn')) mtf=await Promise.all(TFS.map(x=>get(x[1],500).catch(()=>null)));
+      }
     }catch(e){ d=demoData(tf); demo=true; why=e.message; mtf=null; }
     cache={d,mtf,demo,why};
     render();
   }catch(e){ st.textContent='Gagal: '+e.message; }
 }
+$('sym').onchange=()=>{first=true;loadData();};
 $('src').onchange=()=>{ $('key').style.display=$('src').value==='twelve'?'':'none'; first=true; loadData(); };
 $('go').onclick=loadData;
 $('tf').onchange=()=>{first=true;loadData();};
@@ -375,7 +403,7 @@ $('cfg').addEventListener('change',e=>{ if(e.target.id==='tbOn'&&K('tbOn')&&cach
 try{ $('key').value=localStorage.getItem('xau_key')||''; }catch(e){}
 loadData();
 let tick=0;
-setInterval(()=>{ if($('src').value==='binance'||++tick%4===0) loadData(); },30000);
+setInterval(()=>{ if($('src').value!=='twelve'||++tick%4===0) loadData(); },30000);
 }
 </script>
 <script>
