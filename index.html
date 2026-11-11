@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>XAU/USD Chart + RSI + Stoch RSI</title>
+<title>XAU/USD Chart + UT Bot + StochRSI + RSI + BB + MA + Supertrend</title>
 <style>
   :root{--bg:#0f1318;--panel:#171c24;--line:#262d38;--text:#d5dbe3;--mute:#8a94a3;--acc:#f5b942}
   *{box-sizing:border-box}
@@ -11,13 +11,24 @@
   header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
   h1{font-size:16px;margin:0 8px 0 0;color:var(--acc)}
   select,input,button{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit}
+  input[type=checkbox]{padding:0;width:16px;height:16px;vertical-align:middle}
   button{cursor:pointer}button:hover{border-color:var(--acc)}
-  label{color:var(--mute);font-size:12px}
+  label{color:var(--mute);font-size:12px;white-space:nowrap}
   #status{margin-left:auto;color:var(--mute);font-size:12px}
+  details{background:var(--panel);border-bottom:1px solid var(--line);padding:6px 14px}
+  summary{cursor:pointer;color:var(--acc);font-size:13px}
+  .grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+  fieldset{border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  legend{color:var(--acc);font-size:12px;padding:0 4px}
+  fieldset input[type=number]{width:62px}
   .wrap{padding:8px 10px}
   .pane{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
   .tag{position:absolute;left:10px;top:6px;z-index:5;font-size:12px;color:var(--mute);pointer-events:none}
-  #main{height:46vh}#rsi{height:20vh}#stoch{height:22vh}
+  #main{height:52vh}#rsi{height:18vh}#stoch{height:20vh}
+  #mtf{position:absolute;right:62px;bottom:34px;z-index:6;pointer-events:none}
+  #mtf table{border-collapse:collapse;font-size:11px}
+  #mtf th,#mtf td{border:1px solid #0f1318;padding:3px 6px;text-align:center;color:#fff}
+  #mtf th{background:#4b5260}
   .note{color:var(--mute);font-size:12px;padding:2px 4px}
 </style>
 </head>
@@ -34,15 +45,48 @@
   <label>Timeframe
     <select id="tf"><option>1m</option><option>5m</option><option>15m</option><option>30m</option><option selected>1h</option><option>4h</option><option>1d</option></select>
   </label>
-  <label>RSI <input id="rsiN" type="number" value="14" min="2" style="width:52px"></label>
-  <label>Stoch <input id="stN" type="number" value="14" min="2" style="width:52px"></label>
-  <label>K <input id="kN" type="number" value="3" min="1" style="width:46px"></label>
-  <label>D <input id="dN" type="number" value="3" min="1" style="width:46px"></label>
   <button id="go">Muat</button>
   <span id="status"></span>
 </header>
+<details id="cfg" open><summary>Pengaturan indikator</summary>
+<div class="grid">
+  <fieldset><legend>UT Bot</legend>
+    <label><input id="utOn" type="checkbox" checked> Sinyal</label>
+    <label>Key <input id="ua" type="number" step="0.1" value="1"></label>
+    <label>ATR <input id="uc" type="number" value="10"></label>
+    <label><input id="ha" type="checkbox"> Heikin Ashi</label>
+  </fieldset>
+  <fieldset><legend>StochRSI</legend>
+    <label>RSI <input id="sr" type="number" value="14"></label>
+    <label>Stoch <input id="sl" type="number" value="5"></label>
+    <label>K <input id="sk" type="number" value="3"></label>
+    <label>D <input id="sd" type="number" value="3"></label>
+  </fieldset>
+  <fieldset><legend>RSI</legend>
+    <label>Panjang <input id="rl" type="number" value="14"></label>
+  </fieldset>
+  <fieldset><legend>Bollinger</legend>
+    <label><input id="bbOn" type="checkbox" checked> Tampil</label>
+    <label>Len <input id="bl" type="number" value="20"></label>
+    <label>Mult <input id="bm" type="number" step="0.1" value="2"></label>
+  </fieldset>
+  <fieldset><legend>MA</legend>
+    <label><input id="maOn" type="checkbox" checked> Tampil</label>
+    <label>Len <input id="ml" type="number" value="5"></label>
+    <select id="mt"><option>SMA</option><option>EMA</option></select>
+  </fieldset>
+  <fieldset><legend>Supertrend</legend>
+    <label><input id="stOn" type="checkbox" checked> Tampil</label>
+    <label>Faktor <input id="sf" type="number" step="0.1" value="3"></label>
+    <label>ATR <input id="sp" type="number" value="10"></label>
+  </fieldset>
+  <fieldset><legend>Tabel MTF</legend>
+    <label><input id="tbOn" type="checkbox" checked> Tampil (Binance saja)</label>
+  </fieldset>
+</div>
+</details>
 <div class="wrap">
-  <div class="pane"><div class="tag" id="t0">Harga</div><div id="main"></div></div>
+  <div class="pane"><div class="tag" id="t0">Harga</div><div id="main"></div><div id="mtf"></div></div>
   <div class="pane"><div class="tag" id="t1">RSI</div><div id="rsi"></div></div>
   <div class="pane"><div class="tag" id="t2">Stoch RSI</div><div id="stoch"></div></div>
   <div class="note">PAXG adalah token emas yang harganya sangat dekat XAU/USD, tapi bukan harga spot yang persis sama. Untuk XAU/USD asli pilih Twelve Data. Bukan saran investasi.</div>
@@ -55,7 +99,7 @@ if(typeof LightweightCharts==='undefined'){
   $('status').textContent='Library chart gagal dimuat (cek internet / content blocker Safari)';
   throw new Error('LightweightCharts missing');
 }
-const opts = h => ({
+const opts = () => ({
   autoSize: true,
   layout:{background:{color:'#171c24'},textColor:'#8a94a3'},
   grid:{vertLines:{color:'#20262f'},horzLines:{color:'#20262f'}},
@@ -67,15 +111,19 @@ const cMain = LightweightCharts.createChart($('main'), opts());
 const cRsi  = LightweightCharts.createChart($('rsi'), opts());
 const cSt   = LightweightCharts.createChart($('stoch'), opts());
 const candle = cMain.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderVisible:false,wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
+const ln=(c,color,w)=>c.addLineSeries({color,lineWidth:w||1,priceLineVisible:false,lastValueVisible:false});
+const bbM=ln(cMain,'#ff9800',1), bbU=ln(cMain,'#2196f3',1), bbL=ln(cMain,'#2196f3',1), maS=ln(cMain,'#ffeb3b',2);
 const rsiS = cRsi.addLineSeries({color:'#b388ff',lineWidth:2,priceLineVisible:false});
 const kS = cSt.addLineSeries({color:'#2196f3',lineWidth:2,priceLineVisible:false});
 const dS = cSt.addLineSeries({color:'#ff9800',lineWidth:2,priceLineVisible:false});
-[70,50,30].forEach(v=>rsiS.createPriceLine({price:v,color:'#4a5568',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''}));
-[80,50,20].forEach(v=>kS.createPriceLine({price:v,color:'#4a5568',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''}));
-rsiS.applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:0,maxValue:100}})});
-kS.applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:0,maxValue:100}})});
+[80,50,20].forEach(v=>{
+  rsiS.createPriceLine({price:v,color:'#4a5568',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''});
+  kS.createPriceLine({price:v,color:'#4a5568',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''});
+});
+const fix=()=>({priceRange:{minValue:0,maxValue:100}});
+rsiS.applyOptions({autoscaleInfoProvider:fix});
+kS.applyOptions({autoscaleInfoProvider:fix});
 
-// sinkronisasi zoom/scroll
 let lock=false;
 const charts=[cMain,cRsi,cSt];
 charts.forEach(c=>c.timeScale().subscribeVisibleLogicalRangeChange(r=>{
@@ -85,6 +133,19 @@ charts.forEach(c=>c.timeScale().subscribeVisibleLogicalRangeChange(r=>{
 }));
 
 // ---------- indikator ----------
+const N=id=>+$(id).value, K=id=>$(id).checked;
+const cfg=()=>({utOn:K('utOn'),ua:N('ua'),uc:N('uc'),ha:K('ha'),sr:N('sr'),sl:N('sl'),sk:N('sk'),sd:N('sd'),rl:N('rl'),
+  bbOn:K('bbOn'),bl:N('bl'),bm:N('bm'),maOn:K('maOn'),ml:N('ml'),mt:$('mt').value,stOn:K('stOn'),sf:N('sf'),sp:N('sp'),tbOn:K('tbOn')});
+function rma(a,n){
+  const out=Array(a.length).fill(null);
+  if(a.length<n||n<1) return out;
+  let s=0; for(let i=0;i<n;i++) s+=a[i];
+  out[n-1]=s/n;
+  for(let i=n;i<a.length;i++) out[i]=(out[i-1]*(n-1)+a[i])/n;
+  return out;
+}
+const trArr=d=>d.map((x,i)=>i?Math.max(x.high-x.low,Math.abs(x.high-d[i-1].close),Math.abs(x.low-d[i-1].close)):x.high-x.low);
+const atr=(d,n)=>rma(trArr(d),n);
 function calcRSI(c,n){
   const out=Array(c.length).fill(null);
   if(c.length<=n) return out;
@@ -106,6 +167,21 @@ function sma(a,n){
     return s/n;
   });
 }
+function ema(a,n){
+  const out=Array(a.length).fill(null); if(a.length<n) return out;
+  let s=0; for(let i=0;i<n;i++) s+=a[i];
+  out[n-1]=s/n; const al=2/(n+1);
+  for(let i=n;i<a.length;i++) out[i]=al*a[i]+(1-al)*out[i-1];
+  return out;
+}
+function stdev(a,n){
+  return a.map((_,i)=>{
+    if(i<n-1) return null;
+    let m=0; for(let j=i-n+1;j<=i;j++) m+=a[j]; m/=n;
+    let v=0; for(let j=i-n+1;j<=i;j++) v+=(a[j]-m)**2;
+    return Math.sqrt(v/n);
+  });
+}
 function stochRSI(r,n){
   return r.map((v,i)=>{
     if(i<n-1) return null;
@@ -114,20 +190,104 @@ function stochRSI(r,n){
     return mx===mn?0:(v-mn)/(mx-mn)*100;
   });
 }
+function toHA(d){
+  const o=[]; 
+  d.forEach((x,i)=>{
+    const cl=(x.open+x.high+x.low+x.close)/4;
+    const op=i?(o[i-1].open+o[i-1].close)/2:(x.open+x.close)/2;
+    o.push({time:x.time,open:op,close:cl,high:Math.max(x.high,op,cl),low:Math.min(x.low,op,cl)});
+  });
+  return o;
+}
+// UT Bot (ATR trailing stop), sama dengan skrip Pine
+function utCalc(src,at,a){
+  const L=src.length, ts=Array(L).fill(null), pos=Array(L).fill(0), buy=Array(L).fill(false), sell=Array(L).fill(false);
+  for(let i=0;i<L;i++){
+    const prev=i&&ts[i-1]!=null?ts[i-1]:0, s=src[i], sp=i?src[i-1]:null;
+    const loss=at[i]==null?null:a*at[i];
+    if(loss!=null){
+      if(sp!=null&&s>prev&&sp>prev) ts[i]=Math.max(prev,s-loss);
+      else if(sp!=null&&s<prev&&sp<prev) ts[i]=Math.min(prev,s+loss);
+      else ts[i]= s>prev? s-loss : s+loss;
+    }
+    pos[i]= (sp!=null&&sp<prev&&s>prev)?1 : (sp!=null&&sp>prev&&s<prev)?-1 : (i?pos[i-1]:0);
+    if(i&&ts[i]!=null&&ts[i-1]!=null){
+      buy[i]= s>ts[i] && sp<=ts[i-1];
+      sell[i]= s<ts[i] && sp>=ts[i-1] && ts[i]>s && ts[i-1]<=sp;
+    }
+  }
+  return {ts,pos,buy,sell};
+}
+function supertrend(d,f,n){
+  const a=atr(d,n), dir=Array(d.length).fill(null);
+  let pl=0,pu=0,pst=null;
+  for(let i=0;i<d.length;i++){
+    if(a[i]==null){ pl=0;pu=0;pst=null; continue; }
+    const hl2=(d[i].high+d[i].low)/2, up=hl2+f*a[i], lo=hl2-f*a[i];
+    const cp=i?d[i-1].close:d[i].close;
+    const lb=(lo>pl||cp<pl)?lo:pl, ub=(up<pu||cp>pu)?up:pu;
+    let dr;
+    if(i===0||a[i-1]==null) dr=1;
+    else if(pst===pu) dr=d[i].close>ub?-1:1;
+    else dr=d[i].close<lb?1:-1;
+    pst=dr===-1?lb:ub; pl=lb; pu=ub; dir[i]=dr;
+  }
+  return dir;
+}
 const toSeries=(t,a)=>t.map((x,i)=>a[i]==null?{time:x}:{time:x,value:a[i]});
 
+// ---------- Tabel multi timeframe ----------
+const TFS=[['M1','1m'],['M5','5m'],['M15','15m'],['M30','30m'],['H1','1h'],['H4','4h'],['D','1d'],['W','1w']];
+function mtfStats(raw,S){
+  const dd=S.ha?toHA(raw):raw, c=dd.map(x=>x.close), L=c.length-1;
+  const ut=utCalc(c,atr(dd,S.uc),S.ua);
+  let last=c[0];
+  for(let i=1;i<=L;i++) if(ut.pos[i]!==ut.pos[i-1]) last=c[i];
+  const r=calcRSI(c,S.rl), rr=calcRSI(c,S.sr);
+  const k=sma(stochRSI(rr,S.sl),S.sk);
+  const rise=(a,i)=>a[i]!=null&&a[i-1]!=null&&a[i]>a[i-1];
+  return {p:ut.pos[L],price:last,k:k[L],kr:rise(k,L),r:r[L],rr:rise(r,L)};
+}
+function tableHTML(S,mtf){
+  const G='#4caf50',R='#f23645',Y='#fdd835',GR='#787b86',P='#2b303b';
+  const cell=(t,bg,fg)=>`<td style="background:${bg};color:${fg||'#fff'}">${t}</td>`;
+  const col=(v,rising)=>rising&&v>80?R:(!rising&&v>80)?Y:rising?G:GR;
+  const arrow=x=>x?'▲':'▼';
+  const st=mtf.map(r=>r?mtfStats(r,S):null);
+  const row=(name,fn)=>`<tr><th>${name}</th>${st.map(s=>s?fn(s):cell('-',GR)).join('')}</tr>`;
+  return '<table><tr><th></th>'+TFS.map(x=>`<th>${x[0]}</th>`).join('')+'</tr>'
+    +row('Sig',s=>cell(s.p===1?'B':s.p===-1?'S':'-',s.p===1?G:s.p===-1?R:GR))
+    +row('Price',s=>cell(s.price.toFixed(2),P))
+    +row('StochRSI',s=>{const bg=col(s.k,s.kr);return cell(arrow(s.kr),bg,bg===Y?'#000':'#fff');})
+    +row('RSI',s=>{const bg=col(s.r,s.rr);return cell(arrow(s.rr),bg,bg===Y?'#000':'#fff');})
+    +'</table>';
+}
+
 // ---------- data ----------
-async function fetchBinance(tf){
+let okHost=null;
+async function fetchBinance(tf,limit){
   const hosts=['data-api.binance.vision','api.binance.com','api1.binance.com','api.binance.me'];
+  if(okHost) hosts.unshift(okHost);
   let err;
   for(const h of hosts){
     try{
-      const r=await fetch(`https://${h}/api/v3/klines?symbol=PAXGUSDT&interval=${tf}&limit=1000`);
+      const r=await fetch(`https://${h}/api/v3/klines?symbol=PAXGUSDT&interval=${tf}&limit=${limit}`);
       if(!r.ok) throw new Error('HTTP '+r.status);
-      return (await r.json()).map(k=>({time:Math.floor(k[0]/1000),open:+k[1],high:+k[2],low:+k[3],close:+k[4]}));
+      const j=await r.json(); okHost=h;
+      return j.map(k=>({time:Math.floor(k[0]/1000),open:+k[1],high:+k[2],low:+k[3],close:+k[4]}));
     }catch(e){ err=e; }
   }
   throw new Error('Semua server Binance gagal ('+err.message+')');
+}
+async function fetchTwelve(tf,key){
+  const iv={'1m':'1min','5m':'5min','15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'}[tf];
+  const r=await fetch(`https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=${iv}&outputsize=1000&apikey=${encodeURIComponent(key)}`);
+  const j=await r.json();
+  if(j.status==='error'||!j.values) throw new Error(j.message||'Twelve Data error');
+  return j.values.reverse().map(v=>{
+    const s=v.datetime.length===10?v.datetime+'T00:00:00':v.datetime.replace(' ','T');
+    return {time:Math.floor(Date.parse(s+'Z')/1000),open:+v.open,high:+v.high,low:+v.low,close:+v.close};
+  });
 }
 // data acak HANYA untuk mengetes tampilan chart, bukan harga asli
 function demoData(tf){
@@ -140,46 +300,82 @@ function demoData(tf){
   }
   return out;
 }
-async function fetchTwelve(tf,key){
-  const iv={'1m':'1min','5m':'5min','15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'}[tf];
-  const r=await fetch(`https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=${iv}&outputsize=1000&apikey=${encodeURIComponent(key)}`);
-  const j=await r.json();
-  if(j.status==='error'||!j.values) throw new Error(j.message||'Twelve Data error');
-  return j.values.reverse().map(v=>{
-    const s=v.datetime.length===10?v.datetime+'T00:00:00':v.datetime.replace(' ','T');
-    return {time:Math.floor(Date.parse(s+'Z')/1000),open:+v.open,high:+v.high,low:+v.low,close:+v.close};
-  });
-}
 
-let first=true;
-async function load(){
+// ---------- render ----------
+let cache=null, first=true;
+function render(){
+  if(!cache) return;
+  const st=$('status');
+  try{
+    const d=cache.d, S=cfg(), t=d.map(x=>x.time), c=d.map(x=>x.close);
+    const src=S.ha?toHA(d).map(x=>x.close):c;
+    const ut=utCalc(src,atr(d,S.uc),S.ua);
+    candle.setData(d.map((x,i)=>{
+      if(!S.utOn||ut.ts[i]==null) return x;
+      const col=src[i]>ut.ts[i]?'#00e676':src[i]<ut.ts[i]?'#ff1744':null;
+      return col?{...x,color:col,wickColor:col,borderColor:col}:x;
+    }));
+    const mk=[];
+    if(S.utOn) d.forEach((x,i)=>{
+      if(ut.buy[i]) mk.push({time:t[i],position:'belowBar',color:'#00c853',shape:'arrowUp',text:'Buy'});
+      if(ut.sell[i]) mk.push({time:t[i],position:'aboveBar',color:'#ff1744',shape:'arrowDown',text:'Sell'});
+    });
+    if(S.stOn){
+      const sd=supertrend(d,S.sf,S.sp);
+      d.forEach((x,i)=>{
+        if(!i||sd[i]==null||sd[i-1]==null) return;
+        if(sd[i]<0&&sd[i-1]>=0) mk.push({time:t[i],position:'belowBar',color:'#aeea00',shape:'circle',text:'ST Buy'});
+        if(sd[i]>0&&sd[i-1]<=0) mk.push({time:t[i],position:'aboveBar',color:'#ff9100',shape:'circle',text:'ST Sell'});
+      });
+    }
+    mk.sort((a,b)=>a.time-b.time);
+    candle.setMarkers(mk);
+
+    const mid=sma(c,S.bl), sdv=stdev(c,S.bl);
+    bbM.setData(toSeries(t,mid));
+    bbU.setData(toSeries(t,mid.map((m,i)=>m==null?null:m+S.bm*sdv[i])));
+    bbL.setData(toSeries(t,mid.map((m,i)=>m==null?null:m-S.bm*sdv[i])));
+    [bbM,bbU,bbL].forEach(s=>s.applyOptions({visible:S.bbOn}));
+    maS.setData(toSeries(t,S.mt==='SMA'?sma(c,S.ml):ema(c,S.ml)));
+    maS.applyOptions({visible:S.maOn});
+
+    const r=calcRSI(c,S.rl), k=sma(stochRSI(calcRSI(c,S.sr),S.sl),S.sk), dd=sma(k,S.sd);
+    rsiS.setData(toSeries(t,r)); kS.setData(toSeries(t,k)); dS.setData(toSeries(t,dd));
+    $('t1').textContent=`RSI (${S.rl})`;
+    $('t2').textContent=`Stoch RSI (${S.sr}, ${S.sl}, ${S.sk}, ${S.sd})  — biru: %K, oranye: %D`;
+    if(first){ const n=d.length; const rg={from:Math.max(0,n-120),to:n+5}; charts.forEach(x=>x.timeScale().setVisibleLogicalRange(rg)); first=false; }
+
+    $('mtf').innerHTML = (S.tbOn&&cache.mtf)?tableHTML(S,cache.mtf):'';
+    const L=d.length-1, f=v=>v==null?'-':v.toFixed(1);
+    if(cache.demo){ st.textContent=`DATA CONTOH (bukan harga asli) · gagal ambil data: ${cache.why}`; return; }
+    st.textContent=`Close ${d[L].close.toFixed(2)} · UT ${ut.pos[L]===1?'Buy':ut.pos[L]===-1?'Sell':'-'} · RSI ${f(r[L])} · %K ${f(k[L])} · %D ${f(dd[L])}`;
+  }catch(e){ st.textContent='Error render: '+e.message; }
+}
+async function loadData(){
   const st=$('status'); st.textContent='Memuat...';
   try{
     const tf=$('tf').value, src=$('src').value;
     if(src==='twelve'&&!$('key').value) throw new Error('Isi API key Twelve Data dulu');
     try{localStorage.setItem('xau_key',$('key').value);}catch(e){}
-    let d, demo=false;
-    try{ d= src==='binance'? await fetchBinance(tf) : await fetchTwelve(tf,$('key').value); }
-    catch(e){ d=demoData(tf); demo=true; var why=e.message; }
-    const t=d.map(x=>x.time), c=d.map(x=>x.close);
-    const rn=+$('rsiN').value, sn=+$('stN').value, kn=+$('kN').value, dn=+$('dN').value;
-    const r=calcRSI(c,rn), raw=stochRSI(r,sn), k=sma(raw,kn), dd=sma(k,dn);
-    candle.setData(d);
-    rsiS.setData(toSeries(t,r)); kS.setData(toSeries(t,k)); dS.setData(toSeries(t,dd));
-    $('t1').textContent=`RSI (${rn})`;
-    $('t2').textContent=`Stoch RSI (${rn}, ${sn}, ${kn}, ${dn})  — biru: %K, oranye: %D`;
-    if(first){ const n=d.length; const rg={from:Math.max(0,n-120),to:n+5}; charts.forEach(c=>c.timeScale().setVisibleLogicalRange(rg)); first=false; }
-    const last=d[d.length-1];
-    if(demo){ st.textContent=`DATA CONTOH (bukan harga asli) · gagal ambil data: ${why}`; return; }
-    st.textContent=`Close ${last.close.toFixed(2)} · RSI ${r[r.length-1]?.toFixed(1)} · %K ${k[k.length-1]?.toFixed(1)} · %D ${dd[dd.length-1]?.toFixed(1)}`;
+    let d, mtf=null, demo=false, why='';
+    try{
+      if(src==='binance'){
+        d=await fetchBinance(tf,1000);
+        if(K('tbOn')) mtf=await Promise.all(TFS.map(x=>fetchBinance(x[1],500).catch(()=>null)));
+      } else d=await fetchTwelve(tf,$('key').value);
+    }catch(e){ d=demoData(tf); demo=true; why=e.message; mtf=null; }
+    cache={d,mtf,demo,why};
+    render();
   }catch(e){ st.textContent='Gagal: '+e.message; }
 }
-$('src').onchange=()=>{ $('key').style.display=$('src').value==='twelve'?'':'none'; };
-$('go').onclick=load; $('tf').onchange=()=>{first=true;load();};
+$('src').onchange=()=>{ $('key').style.display=$('src').value==='twelve'?'':'none'; first=true; loadData(); };
+$('go').onclick=loadData;
+$('tf').onchange=()=>{first=true;loadData();};
+$('cfg').addEventListener('change',e=>{ if(e.target.id==='tbOn'&&K('tbOn')&&cache&&!cache.mtf) loadData(); else render(); });
 try{ $('key').value=localStorage.getItem('xau_key')||''; }catch(e){}
-load();
+loadData();
 let tick=0;
-setInterval(()=>{ if($('src').value==='binance'||++tick%4===0) load(); },30000);
+setInterval(()=>{ if($('src').value==='binance'||++tick%4===0) loadData(); },30000);
 }
 </script>
 <script>
